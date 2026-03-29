@@ -270,9 +270,11 @@ function update() {
 
           const allSet = (collectedCount === totalItems);
           if (allSet) {
-            currentStage.activeMessage = itemName + (currentStage.itemMessage || "発見！") + "\n全てのアイテムを回収した！\n元の魔法陣に戻って脱出しよう！";
+            // itemName（名前） + "を発見した！" と直接書く
+            currentStage.activeMessage = itemName + "を発見した！\n全てのアイテムを回収した！\n元の魔法陣に戻って脱出しよう！";
           } else {
-            currentStage.activeMessage = itemName + (currentStage.itemMessage || "発見！") + "\n（残り " + (totalItems - collectedCount) + " 個）";
+            // こちらも itemName + "を発見した！" に統一
+            currentStage.activeMessage = itemName + "を発見した！\n（残り " + (totalItems - collectedCount) + " 個）";
           }
         }
       });

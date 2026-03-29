@@ -4,7 +4,8 @@ const STAGES = {
     name: "依頼０１：老人の魔法使い",
     description: "ダンジョン内にスクロールを忘れてしまってのう。\nそれを回収して来てくれんかのう。",
     successMsg: "おうおう、ありがとう。\n…あれ、このスクロールじゃったかのう？",
-    itemMessage: "スクロールを発見した！",
+    itemNames: ["スクロール"], // 名前をここに分離
+    itemMessage: "を発見した！",  // 文章だけに
     reward: 500,
     map: [
       [1,1,1,1,1,1,1],
@@ -23,7 +24,8 @@ const STAGES = {
     name: "依頼０２：冒険者の若者",
     description: "依頼は達成したが、その契約書を無くして\nしまった。契約書を回収してくれ！",
     successMsg: "良かったあああ！！これで報酬をもらえるぜ！\nありがとよ礼を言うぜ。",
-    itemMessage: "契約書を発見した！",
+    itemNames: ["契約書"],
+    itemMessage: "を発見した！",
     timeLimit: 180,
     reward: 1200,
     map: [
@@ -79,7 +81,8 @@ mission4: {
     name: "依頼０４：シーフの女性",
     description: "探索中に髪飾りを無くしてしまったんです。\n多分あの階にあると思いますが…",
     successMsg: "コレ『彼女』からのプレゼントなんです。\n本当にありがとうございました！",
-    itemMessage: "髪飾りを発見した！",
+    itemNames: ["髪飾り"],
+    itemMessage: "を発見した！",
     timeLimit: 240, 
     reward: 3500,
     map: [
