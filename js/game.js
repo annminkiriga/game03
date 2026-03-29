@@ -484,11 +484,19 @@ function showResult(isSuccess, isTimeOut) {
     if (!prevBest || timeUsed < parseInt(prevBest)) localStorage.setItem(`bestTime_${stageId}`, timeUsed);
   } else {
     sounds.failJingle.currentTime = 0; sounds.failJingle.play();
-    resultTitle.innerText = "FAILED ..."; resultTitle.className = "failed";
+    // --- 修正箇所 ---
+    resultTitle.innerText = "FAILED ...";
+    resultTitle.className = "failed";
+
+    if (typeof failSE !== 'undefined') {
+        failSE.currentTime = 0; 
+        failSE.play();
+    }
+
     resultDesc.innerText = isTimeOut ? "魔法の効果が切れたが、何とか脱出した…" : "依頼品を回収できずに帰還した。";
     resultGold.innerText = "報酬なし";
-  }
-}
+  } // ここで if (failed) などのブロックを閉じる
+}   // ここで関数全体を閉じる（元々のコードに合わせています）
 
 const setupInput = (id, keyName) => {
     const btn = document.getElementById(id); if (!btn) return;
