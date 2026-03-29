@@ -1,5 +1,5 @@
 // ==========================================
-// game.js - 統合版（前半）
+// game.js - 【真・完全版】■前半
 // ==========================================
 
 // --- 1. 定数・変数定義 ---
@@ -27,7 +27,6 @@ let timerFrame = 0;
 let currentLimit = 0;
 let isFading = false;
 let fadeAlpha = 0;
-// 保存された所持金があればそれを、なければ 300 を初期値にする
 let userGold = parseInt(localStorage.getItem('userGold')) || 300;
 
 let selectedTime = 60;
@@ -36,14 +35,11 @@ let tempStageKey = "";
 
 const keys = { up: false, left: false, right: false, down: false };
 
-// アイテム画像の読み込みチェック
 const itemImage = new Image();
 itemImage.src = "images/fukidashi_mugon_white.png";
 let itemImageReady = false;
 itemImage.onload = () => { itemImageReady = true; };
-itemImage.onerror = () => { console.warn("images/item.png が見つかりません。代替表示を行います。"); };
 
-// --- オーディオ設定 ---
 const sounds = {
   menuBgm: new Audio("sounds/maou_game_dangeon05.mp3"),
   dungeonBgm: new Audio("sounds/maou_game_dangeon17.mp3"),
@@ -55,37 +51,32 @@ const sounds = {
 sounds.menuBgm.loop = true;
 sounds.dungeonBgm.loop = true;
 
+// 【修正箇所】BGMの安定化（二重再生ガード）
 function playBgm(targetBgm) {
-  // ★この一行を追加：指定されたBGMがすでに再生中なら、処理を中断して戻る
-  if (targetBgm && !targetBgm.paused) return;
-
+  if (targetBgm && !targetBgm.paused) return; // すでに鳴ってたら何もしない
+  
   [sounds.menuBgm, sounds.dungeonBgm].forEach(s => {
     if (s !== targetBgm) {
       s.pause();
-      s.currentTime = 0;
+      // 実機安定のため currentTime=0 は頻繁に行わない
     }
   });
+  
   if (targetBgm) {
     targetBgm.play().catch(e => console.log("再生制限:", e));
   }
 }
 
-// 聖職者画面のUI更新（強調表示の修正）
 function updatePriestUI() {
   document.getElementById("currentGoldDisplay").innerText = userGold;
   const btns = document.querySelectorAll(".opt-btn");
   btns.forEach(b => {
-    // ボタンのテキストに「60秒」「120秒」などの文字列が含まれているかで判定
-    if (b.innerText.includes(selectedTime + "秒")) {
-      b.classList.add("selected");
-    } else {
-      b.classList.remove("selected");
-    }
+    if (b.innerText.includes(selectedTime + "秒")) b.classList.add("selected");
+    else b.classList.remove("selected");
   });
   goButton.disabled = (userGold < selectedCost);
 }
 
-// 加護（時間）の選択
 window.selectMagic = function(time, cost) {
   selectedTime = time; 
   selectedCost = cost;
@@ -102,6 +93,8 @@ function showScene(scene) {
     else if (scene === "select") { selectScreen.style.display = "flex"; renderMissionList(); }
     else if (scene === "priest") { priestScreen.style.display = "flex"; updatePriestUI(); }
   } else if (scene === "exploration") {
+    // 【修正】ここで制限時間をセット
+    currentLimit = selectedTime;
     playBgm(sounds.dungeonBgm);
     canvas.style.display = "block";
     document.getElementById("controls").style.display = "grid";
@@ -119,8 +112,6 @@ function renderMissionList() {
   Object.keys(STAGES).forEach(key => {
     const s = STAGES[key];
     const best = localStorage.getItem(`bestTime_${s.id}`) || "--";
-
-    // --- 1. 踏破データの読み込みと計算 ---
     const exploredData = localStorage.getItem(`explored_${s.id}`);
     let mapRate = 0;
     if (exploredData) {
@@ -129,13 +120,14 @@ function renderMissionList() {
       const count = grid.flat().filter(v => v === true).length;
       mapRate = Math.floor((count / total) * 100);
     }
-
     const card = document.createElement("div");
     card.className = "mission-card";
-    // --- 修正後のコード ---
     card.innerHTML = `
       <h3>${s.name}</h3>
-      <p>${s.description}</p> <div class="mission-stats">自己ベスト: <span>${best}秒</span> / 踏破率: <span>${mapRate}%</span></div>
+      <p>${s.description}</p>
+      <div class="mission-stats">
+        自己ベスト: <span>${best}秒</span> / 踏破率: <span>${mapRate}%</span>
+      </div>
       <div class="mission-info">報酬: ${s.reward}G</div>
     `;
     card.onclick = () => { tempStageKey = key; showScene("priest"); };
@@ -148,12 +140,13 @@ function loadExploration(id, rows, cols) {
   if (data) return JSON.parse(data);
   return Array.from({ length: rows }, () => Array(cols).fill(false));
 }
-function saveExploration(id) { localStorage.setItem(`explored_${id}`, JSON.stringify(exploredMap)); }
 
-//■後半
-// --- 2. ゲームエンジン & マッピング ---
+function saveExploration(id) { 
+  localStorage.setItem(`explored_${id}`, JSON.stringify(exploredMap)); 
+}
 
-function initGame(stageKey) {
+      //■後半
+      function initGame(stageKey) {
   currentStage = STAGES[stageKey];
   player.x = Math.floor(currentStage.startPos.x);
   player.y = Math.floor(currentStage.startPos.y);
@@ -253,38 +246,33 @@ function update() {
       player.viewX = player.targetX; player.viewY = player.targetY;
       player.x = Math.floor(player.targetX); player.y = Math.floor(player.targetY);
       player.moving = false; updateExploredArea();
-      // アイテム取得チェック
+      
       items.forEach(it => {
         if (!it.collected && player.x === Math.floor(it.x) && player.y === Math.floor(it.y)) {
-          
           it.collected = true; 
           getMsgTimer = 180;
           window.itemFlash = 0.8;
           sounds.itemGet.currentTime = 0;
           sounds.itemGet.play();
-
-          // 【汎用化】今拾ったのが「何個目か」を取得
           const collectedCount = items.filter(i => i.collected).length;
-          const totalItems = items.length; // ステージの全アイテム数
-
-          // 名前リストがあればその名前を、なければ「アイテム」とする
+          const totalItems = items.length;
+          // game.js の update 関数内、items.forEach の中
+          // --- ここから修正 ---
           let itemName = "";
           if (currentStage.itemNames && currentStage.itemNames[collectedCount - 1]) {
+            // 設定された名前（「スクロール」など）をそのまま使う
             itemName = currentStage.itemNames[collectedCount - 1];
           } else {
+            // 設定がない場合のみ「アイテム1」のように表示
             itemName = "アイテム" + (totalItems > 1 ? collectedCount : "");
           }
+          // --- ここまで ---
 
-          // 全て取ったかチェック
           const allSet = (collectedCount === totalItems);
-          
           if (allSet) {
-            // 全て取り終えた時
             currentStage.activeMessage = itemName + (currentStage.itemMessage || "発見！") + "\n全てのアイテムを回収した！\n元の魔法陣に戻って脱出しよう！";
           } else {
-            // まだ残っている時（残り個数を出すのもアリ）
-            const remaining = totalItems - collectedCount;
-            currentStage.activeMessage = itemName + (currentStage.itemMessage || "発見！") + "\n（残り " + remaining + " 個）";
+            currentStage.activeMessage = itemName + (currentStage.itemMessage || "発見！") + "\n（残り " + (totalItems - collectedCount) + " 個）";
           }
         }
       });
@@ -306,79 +294,42 @@ function update() {
   }
 }
 
-// --- 1. 新しい関数を draw の前に追加 ---
 const texturedCache = {};
 function getColoredTexture(color) {
   if (texturedCache[color]) return texturedCache[color];
-
   const c = document.createElement('canvas');
-  c.width = textureCanvas.width;
-  c.height = textureCanvas.height;
+  c.width = textureCanvas.width; c.height = textureCanvas.height;
   const ctx = c.getContext('2d');
-
-  // 1. まず、指定した明るい色で下地を塗る
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, c.width, c.height);
-
-  // 2. その上に、元のレンガ画像を「スクリーン (screen)」モードで重ねる
-  // これにより、元の画像の「白い部分（模様のハイライト）」だけが浮き上がり、
-  // 全体的に指定した色よりもさらに明るい質感になります。
-  ctx.globalAlpha = 0.5; // 模様の主張を少し抑える（板壁っぽくするため）
-  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = color; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.globalAlpha = 0.5; ctx.globalCompositeOperation = 'screen';
   ctx.drawImage(textureCanvas, 0, 0);
-  
-  ctx.globalAlpha = 1.0;
-  ctx.globalCompositeOperation = 'source-over';
-
+  ctx.globalAlpha = 1.0; ctx.globalCompositeOperation = 'source-over';
   texturedCache[color] = c;
   return c;
 }
 
-// --- 2. 既存の function draw() { ... } を以下の内容にまるごと差し替え ---
 function draw() {
   const w = canvas.width, h = canvas.height, fov = Math.PI / 3;
-  
-  // ステージタイプによる色決定
-  let floorBaseColor = "#131"; 
-  let magicCircleColor = "#033"; 
-  let wallColor = null;
-
-  if (currentStage.type === "wood") {
-    floorBaseColor = "#4d3926"; // 床は前回の落ち着いた茶色に戻す
-    magicCircleColor = "#2d1e12"; 
-    // 壁：ここを明るいベージュにすると、スクリーン効果で「明るい板壁」になります
-    wallColor = "#deb887";      
-  }
-
+  let floorBaseColor = "#131", magicCircleColor = "#033", wallColor = null;
+  if (currentStage.type === "wood") { floorBaseColor = "#4d3926"; magicCircleColor = "#2d1e12"; wallColor = "#deb887"; }
   const currentWallTex = wallColor ? getColoredTexture(wallColor) : textureCanvas;
-
-  // 天井
-  ctx.fillStyle = "#111"; 
-  ctx.fillRect(0, 0, w, h/2);
-
-  // 地面
+  ctx.fillStyle = "#111"; ctx.fillRect(0, 0, w, h/2);
   for (let y = h/2; y < h; y++) {
     const directDist = (h / 2) / (y - h / 2);
     for (let x = 0; x < w; x += 4) {
       const angle = player.viewDir + (x / w - 0.5) * fov;
       const realDist = directDist / Math.cos(angle - player.viewDir);
-      const worldX = player.viewX + Math.cos(angle) * realDist;
-      const worldY = player.viewY + Math.sin(angle) * realDist;
+      const worldX = player.viewX + Math.cos(angle) * realDist, worldY = player.viewY + Math.sin(angle) * realDist;
       const dx = worldX - currentStage.startPos.x, dy = worldY - currentStage.startPos.y;
       const distStart = Math.sqrt(dx*dx + dy*dy);
-      
       if (distStart < 0.6 && distStart > 0.5) ctx.fillStyle = "#0ff";
       else if (distStart < 0.5) {
         const isStanding = (Math.abs(player.viewX - currentStage.startPos.x) < 0.3 && Math.abs(player.viewY - currentStage.startPos.y) < 0.3);
         ctx.fillStyle = isStanding ? "#066" : magicCircleColor;
-      } else {
-        ctx.fillStyle = floorBaseColor;
-      }
+      } else ctx.fillStyle = floorBaseColor;
       ctx.fillRect(x, y, 4, 1);
     }
   }
-
-  // 壁
   const zBuffer = new Array(w);
   for (let i = 0; i < w; i++) {
     const angle = player.viewDir + (i / w - 0.5) * fov;
@@ -389,18 +340,10 @@ function draw() {
     const hX = player.viewX + Math.cos(angle) * rawDist, hY = player.viewY + Math.sin(angle) * rawDist;
     let tX = (Math.abs(hY % 1) > Math.abs(hX % 1)) ? hY % 1 : hX % 1;
     if (tX < 0) tX += 1;
-
-    // 染め上げたテクスチャを描画
     ctx.drawImage(currentWallTex, Math.floor(tX * texSize), 0, 1, texSize, i, top, 1, wallH);
-
-    // 距離による影
-    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, dist * 0.18)})`;
-    ctx.fillRect(i, top, 1, wallH);
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, dist * 0.18)})`; ctx.fillRect(i, top, 1, wallH);
   }
-
   drawSprites(zBuffer, w, h, fov);
-
-  // UI・メッセージ関連
   if (startMsgTimer > 0) {
     ctx.save(); ctx.font = "bold 60px sans-serif"; ctx.textAlign = "center";
     ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, startMsgTimer/30)})`;
@@ -411,21 +354,16 @@ function draw() {
     ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 4;
     const msg = currentStage.activeMessage || "";
     const lines = msg.split('\n');
-    lines.forEach((l, idx) => { 
-      const py = (h/2+50)+(idx*30); 
-      ctx.strokeText(l, w/2, py); 
-      ctx.fillText(l, w/2, py); 
-    });
+    lines.forEach((l, idx) => { const py = (h/2+50)+(idx*30); ctx.strokeText(l, w/2, py); ctx.fillText(l, w/2, py); });
     ctx.restore();
   }
   if (fadeAlpha > 0) { ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`; ctx.fillRect(0, 0, w, h); }
   if (minimapCanvas && minimapCanvas.style.display !== "none") drawMinimap();
   if (window.itemFlash > 0) {
-    ctx.fillStyle = `rgba(255, 255, 255, ${window.itemFlash})`;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = `rgba(255, 255, 255, ${window.itemFlash})`; ctx.fillRect(0, 0, w, h);
     window.itemFlash -= 0.05;
   }
-}//ここがdraw関数の終わり
+}
 
 function drawMinimap() {
   const mSize = minimapCanvas.width;
@@ -444,11 +382,9 @@ function drawMinimap() {
         if (tx === Math.floor(currentStage.startPos.x) && ty === Math.floor(currentStage.startPos.y)) {
           mCtx.fillStyle = "#0ff"; mCtx.fillRect(drawX + 1, drawY + 1, cellSize - 2, cellSize - 2);
         }
-        items.forEach(it => {
-          if (it.collected && Math.floor(it.x) === tx && Math.floor(it.y) === ty) {
-            mCtx.fillStyle = "#ffff00"; mCtx.beginPath(); mCtx.arc(drawX + cellSize/2, drawY + cellSize/2, cellSize/4, 0, Math.PI * 2); mCtx.fill();
-          }
-        });
+        items.forEach(it => { if (it.collected && Math.floor(it.x) === tx && Math.floor(it.y) === ty) {
+          mCtx.fillStyle = "#ffff00"; mCtx.beginPath(); mCtx.arc(drawX + cellSize/2, drawY + cellSize/2, cellSize/4, 0, Math.PI * 2); mCtx.fill();
+        }});
       }
     }
   }
@@ -480,12 +416,7 @@ for(let i=0; i<4; i++) { for(let j=0; j<2; j++) {
 }}
 
 function drawSprites(zBuffer, w, h, fov) {
-  // 画像が読み込まれていない場合は、エラー回避のために描画をスキップ
-  if (!itemImageReady || items.length === 0) {
-      // 代替として黄色い四角を描画するロジック（画像がなくても進行可能にする）
-      drawFallBackItems(zBuffer, w, h, fov);
-      return;
-  }
+  if (!itemImageReady || items.length === 0) { drawFallBackItems(zBuffer, w, h, fov); return; }
   items.forEach(it => {
     if (it.collected) return;
     const dx = it.x - player.viewX, dy = it.y - player.viewY;
@@ -520,8 +451,7 @@ function drawFallBackItems(zBuffer, w, h, fov) {
         const sXCenter = (0.5 + sAngle / fov) * w;
         const dXStart = Math.floor(sXCenter - sW/2);
         if (dXStart >= 0 && dXStart < w && zBuffer[dXStart] >= distPos - 0.1) {
-            ctx.fillStyle = "yellow";
-            ctx.fillRect(dXStart, h/2 - sH/2, sW, sH);
+            ctx.fillStyle = "yellow"; ctx.fillRect(dXStart, h/2 - sH/2, sW, sH);
         }
     });
 }
@@ -532,59 +462,34 @@ function startLevel(stageKey) {
   if (!window.isLooping) { loop(); window.isLooping = true; }
 }
 
-function showResult(isManualExit, isTimeOut) {
-  const allCollected = items.every(it => it.collected);
+function showResult(isSuccess, isTimeOut) {
   const stageId = currentStage.id;
   showScene("none");
   resultScreen.style.display = "flex";
-  
   const resultTitle = document.getElementById("resultTitle");
   const resultDesc = document.getElementById("resultDesc");
   const resultGold = document.getElementById("resultGold");
 
-  // ジングルの再生（currentTimeのリセットを追加）
-  if (allCollected) {
-    sounds.clearJingle.currentTime = 0;
-    sounds.clearJingle.play();
-    
-    resultTitle.innerText = "CLEAR !"; 
-    resultTitle.className = "success";
-
-    // --- ここから表示の書き換え ---
-    // 依頼人名を抽出（「：」より後ろ）
-    const clientName = currentStage.name.includes("：") 
-                       ? currentStage.name.split("：")[1] 
-                       : "依頼人";
-
-    // innerHTML を使い、【名前】と「改行反映済みのセリフ」を表示
+  if (isSuccess) {
+    sounds.clearJingle.currentTime = 0; sounds.clearJingle.play();
+    resultTitle.innerText = "CLEAR !"; resultTitle.className = "success";
+    const clientName = currentStage.name.includes("：") ? currentStage.name.split("：")[1] : "依頼人";
     resultDesc.innerHTML = `<span class="success">【${clientName}】</span><br>${(currentStage.successMsg || "任務を完遂しました。").replace(/\n/g, '<br>')}`;
-    // --- ここまで ---
-
     resultGold.innerText = `${currentStage.reward} ゴールド獲得！！`;
-    userGold += currentStage.reward; // 既存の変数を維持
-    localStorage.setItem('userGold', userGold); // ★これを追記
-    
+    userGold += currentStage.reward; localStorage.setItem('userGold', userGold);
     const timeUsed = selectedTime - currentLimit;
     const prevBest = localStorage.getItem(`bestTime_${stageId}`);
-    if (!prevBest || timeUsed < parseInt(prevBest)) {
-      localStorage.setItem(`bestTime_${stageId}`, timeUsed);
-    }
+    if (!prevBest || timeUsed < parseInt(prevBest)) localStorage.setItem(`bestTime_${stageId}`, timeUsed);
   } else {
-    sounds.failJingle.currentTime = 0;
-    sounds.failJingle.play();
-    
-    resultTitle.innerText = "FAILED ..."; 
-    resultTitle.className = "failed";
-    
-    // 失敗時は innerText のままでも良いですが、一応 innerHTML で統一しておくと安全です
+    sounds.failJingle.currentTime = 0; sounds.failJingle.play();
+    resultTitle.innerText = "FAILED ..."; resultTitle.className = "failed";
     resultDesc.innerText = isTimeOut ? "魔法の効果が切れたが、何とか脱出した…" : "依頼品を回収できずに帰還した。";
     resultGold.innerText = "報酬なし";
   }
 }
 
 const setupInput = (id, keyName) => {
-    const btn = document.getElementById(id);
-    if (!btn) return;
+    const btn = document.getElementById(id); if (!btn) return;
     const start = (e) => { if (e.cancelable) e.preventDefault(); keys[keyName] = true; };
     const end = (e) => { if (e.cancelable) e.preventDefault(); keys[keyName] = false; };
     btn.addEventListener("touchstart", start, { passive: false });
@@ -598,43 +503,25 @@ window.addEventListener("keyup", (e) => { if(e.key.includes("Arrow")) keys[e.key
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
 document.getElementById("toSelectButton").onclick = () => {
-  // 全ての音をループで回すのをやめ、menuBgmの再生権限だけを得る
-  sounds.menuBgm.play().then(() => {
-    // 成功したらそのまま選択画面へ
-    showScene("select");
-  }).catch(() => {
-    // 失敗（ブロック）されても画面だけは進める
-    showScene("select");
-  });
+  sounds.menuBgm.play().then(() => showScene("select")).catch(() => showScene("select"));
 };
 document.getElementById("backToTitle").onclick = () => showScene("title");
 document.getElementById("backToSelect").onclick = () => showScene("select");
 document.getElementById("exitNo").onclick = () => { confirmDiv.style.display = "none"; gameActive = true; };
-document.getElementById("exitYes").onclick = () => { confirmDiv.style.display = "none"; showResult(true, false); };
+
+document.getElementById("exitYes").onclick = () => { 
+  confirmDiv.style.display = "none"; 
+  const allCollected = items.every(it => it.collected); 
+  showResult(allCollected, false); 
+};
+
 document.getElementById("backFromResult").onclick = () => { resultScreen.style.display = "none"; showScene("title"); };
-// --- goButton.onclick の中身をこれに差し替え ---
 goButton.onclick = () => {
-  // 1. お金が足りるかチェック
-  if (userGold < selectedCost) {
-    alert("ゴールドが足りません！");
-    return;
-  }
-
-  // 2. お金を引く
+  if (userGold < selectedCost) { alert("ゴールドが足りません！"); return; }
   userGold -= selectedCost;
-  localStorage.setItem('userGold', userGold); // ★これを追記
-
-  // 3. 【最重要】引いた後の金額をブラウザに保存する
-  localStorage.setItem("userGold", userGold);
-
-  // 4. 出発！
-  currentLimit = selectedTime;
+  localStorage.setItem('userGold', userGold);
   startLevel(tempStageKey);
-  
-  // モーダルを閉じる
-  if (document.getElementById("missionModal")) {
-    document.getElementById("missionModal").style.display = "none";
-  }
+  if (document.getElementById("missionModal")) document.getElementById("missionModal").style.display = "none";
 };
 
 function resize() {
@@ -643,30 +530,14 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 function loop() { update(); draw(); requestAnimationFrame(loop); }
-
 showScene("title");
 
 document.addEventListener('touchstart', (e) => { if (e.touches.length > 1 && e.cancelable) e.preventDefault(); }, { passive: false });
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (e) => {
-    const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300 && e.cancelable) e.preventDefault();
-    lastTouchEnd = now;
+    const now = (new Date()).getTime(); if (now - lastTouchEnd <= 300 && e.cancelable) e.preventDefault(); lastTouchEnd = now;
 }, false);
-document.addEventListener('touchmove', (e) => {
-    if (!e.target.closest('#missionList') && e.cancelable) e.preventDefault();
-}, { passive: false });
+document.addEventListener('touchmove', (e) => { if (!e.target.closest('#missionList') && e.cancelable) e.preventDefault(); }, { passive: false });
 let audioStarted = false;
-window.startAudio = function() {
-    if (audioStarted) return; 
-    
-    // 画面のどこかを触った瞬間にBGMを解禁して流す
-    playBgm(sounds.menuBgm);
-    audioStarted = true;
-};
-window.resetAllData = function() {
-    if (confirm("これまでの踏破記録や所持金をすべてリセットしますか？")) {
-        localStorage.clear(); // 全データを削除
-        location.reload();    // 画面をリロードして反映
-    }
-};
+window.startAudio = function() { if (audioStarted) return; playBgm(sounds.menuBgm); audioStarted = true; };
+window.resetAllData = function() { if (confirm("これまでの踏破記録や所持金をすべてリセットしますか？")) { localStorage.clear(); location.reload(); } };
