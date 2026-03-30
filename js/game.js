@@ -313,7 +313,15 @@ function getColoredTexture(color) {
 function draw() {
   const w = canvas.width, h = canvas.height, fov = Math.PI / 3;
   let floorBaseColor = "#131", magicCircleColor = "#033", wallColor = null;
-  if (currentStage.type === "wood") { floorBaseColor = "#4d3926"; magicCircleColor = "#2d1e12"; wallColor = "#deb887"; }
+if (currentStage.type === "wood") { 
+    floorBaseColor = "#4d3926"; magicCircleColor = "#2d1e12"; wallColor = "#deb887"; 
+  }
+    else if (currentStage.type === "earth") { 
+    // 漆黒に近い土壁：レンガの模様が辛うじて判別できる暗さ
+    floorBaseColor = "#080604"; // さらに黒く、沈み込む床
+    magicCircleColor = "#1a140d"; // 鈍い光を放つ魔法陣
+    wallColor = "#1a120c";       // 【ここがポイント】極限まで明度を落とした焦げ茶
+  }
   const currentWallTex = wallColor ? getColoredTexture(wallColor) : textureCanvas;
   ctx.fillStyle = "#111"; ctx.fillRect(0, 0, w, h/2);
   for (let y = h/2; y < h; y++) {
